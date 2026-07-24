@@ -6,16 +6,10 @@ Discovers all downstream assets affected by a schema change.
 import os
 from typing import Any
 from dotenv import load_dotenv
-from datahub.ingestion.graph.client import DatahubClientConfig, DataHubGraph
 
 load_dotenv()
 
 DATAHUB_SERVER = os.getenv("DATAHUB_SERVER", "http://127.0.0.1:8979")
-
-
-def get_datahub_graph() -> DataHubGraph:
-    config = DatahubClientConfig(server=DATAHUB_SERVER)
-    return DataHubGraph(config)
 
 
 def run_scout(entity_urn: str) -> dict[str, Any]:
