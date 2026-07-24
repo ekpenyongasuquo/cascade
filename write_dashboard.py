@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+html = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -123,7 +123,7 @@ return'tag-default';
 function renderResults(data,changedField,newField){
 const br=data.blast_radius;
 const sc=data.schema_change;
-const reportLines=data.incident_report.split('\n');
+const reportLines=data.incident_report.split('\\n');
 let summary='';let inSummary=false;
 for(const line of reportLines){
 if(line.includes('Executive Summary')){inSummary=true;continue;}
@@ -168,4 +168,9 @@ document.getElementById('results').style.display='block';
 }
 </script>
 </body>
-</html>
+</html>"""
+
+f = open('dashboard.html', 'w', encoding='utf-8')
+f.write(html)
+f.close()
+print("dashboard.html written successfully")
