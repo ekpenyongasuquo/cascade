@@ -1,4 +1,5 @@
-import hashlib, hmac, os, json
+content = open('webhook/receiver.py', 'w', encoding='utf-8')
+content.write("""import hashlib, hmac, os, json
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,3 +39,6 @@ async def webhook(request: Request, background_tasks: BackgroundTasks):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+""")
+content.close()
+print("receiver.py written successfully")
