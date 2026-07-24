@@ -6,8 +6,11 @@ Receives GitHub PR events and triggers the full CASCADE pipeline.
 import hashlib
 import hmac
 import os
+import json
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
 from dotenv import load_dotenv
 import sys
 
@@ -27,9 +30,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 def verify_github_signature(payload: bytes, signature: str) -> bool:
-    """Verify the GitHub webhook signature."""
     expected = "sha256=" + hmac.new(
         GITHUB_WEBHOOK_SECRET.encode(),
         payload,
@@ -39,27 +49,18 @@ def verify_github_signature(payload: bytes, signature: str) -> bool:
 
 
 def extract_schema_change(pr_payload: dict) -> dict | None:
-    """
-    Extract schema change details from a GitHub PR payload.
-    Looks for column rename patterns in PR title and body.
-    """
     title = pr_payload.get("pull_request", {}).get("title", "").lower()
-    body = pr_payload.get("pull_request", {}).get("body", "") or ""
 
-    # Detect schema change keywords
     schema_keywords = ["rename", "column", "schema", "alter table", "drop column"]
     is_schema_change = any(kw in title for kw in schema_keywords)
 
     if not is_schema_change:
         return None
 
-    # For demo — extract from PR title pattern "rename X to Y"
-    # Example: "rename order_date to created_at in orders table"
     changed_field = "order_date"
     new_field = "created_at"
     entity_urn = "urn:li:dataset:(urn:li:dataPlatform:postgres,ecommerce.orders,PROD)"
 
-    # Try to parse from title
     words = title.split()
     if "rename" in words and "to" in words:
         try:
@@ -81,7 +82,6 @@ def extract_schema_change(pr_payload: dict) -> dict | None:
 
 
 def run_cascade_pipeline(schema_change: dict) -> dict:
-    """Run the full CASCADE pipeline."""
     scout_result = run_scout(schema_change["entity_urn"])
     valuation_result = run_valuation(scout_result)
     patch_result = run_patch(
@@ -98,6 +98,19 @@ def run_cascade_pipeline(schema_change: dict) -> dict:
 
 @app.get("/")
 async def root():
+    dashboard = Path(__file__).parent.parent / "dashboard.html"
+    if dashboard.exists():
+        return HTMLResponse(content=dashboard.read_text(encoding="utf-8"))
+    return JSONResponse({
+        "name": "CASCADE",
+        "description": "Blast Radius Intelligence Agent",
+        "status": "running",
+        "version": "1.0.0",
+    })
+
+
+@app.get("/api")
+async def api_info():
     return {
         "name": "CASCADE",
         "description": "Blast Radius Intelligence Agent",
@@ -116,19 +129,15 @@ async def github_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
 ):
-    """Receive GitHub PR webhook and trigger CASCADE."""
-
-    # Verify signature
     signature = request.headers.get("X-Hub-Signature-256", "")
     payload = await request.body()
 
     if signature and not verify_github_signature(payload, signature):
         raise HTTPException(status_code=401, detail="Invalid signature")
 
-    data = await request.json() if not payload else __import__("json").loads(payload)
+    data = json.loads(payload)
     event = request.headers.get("X-GitHub-Event", "")
 
-    # Only process PR events
     if event != "pull_request":
         return JSONResponse({"status": "ignored", "reason": "not a PR event"})
 
@@ -136,12 +145,10 @@ async def github_webhook(
     if action not in ["opened", "synchronize"]:
         return JSONResponse({"status": "ignored", "reason": f"PR action '{action}' not monitored"})
 
-    # Extract schema change
     schema_change = extract_schema_change(data)
     if not schema_change:
         return JSONResponse({"status": "ignored", "reason": "no schema change detected"})
 
-    # Run CASCADE pipeline
     print(f"\n[CASCADE] PR #{schema_change['pr_number']} — schema change detected!")
     print(f"[CASCADE] {schema_change['changed_field']} → {schema_change['new_field']}")
 
@@ -164,10 +171,6 @@ async def github_webhook(
 
 @app.post("/trigger")
 async def manual_trigger(request: Request):
-    """
-    Manual trigger endpoint for demo purposes.
-    Simulates a GitHub PR schema change event.
-    """
     body = await request.json()
 
     entity_urn = body.get(
@@ -175,35 +178,4 @@ async def manual_trigger(request: Request):
         "urn:li:dataset:(urn:li:dataPlatform:postgres,ecommerce.orders,PROD)"
     )
     changed_field = body.get("changed_field", "order_date")
-    new_field = body.get("new_field", "created_at")
-
-    print(f"\n[CASCADE] Manual trigger — {changed_field} → {new_field}")
-
-    schema_change = {
-        "entity_urn": entity_urn,
-        "changed_field": changed_field,
-        "new_field": new_field,
-        "pr_number": "DEMO",
-        "pr_title": f"rename {changed_field} to {new_field}",
-        "repo": "demo/ecommerce",
-    }
-
-    result = run_cascade_pipeline(schema_change)
-
-    return JSONResponse({
-        "status": "cascade_complete",
-        "schema_change": schema_change,
-        "blast_radius": {
-            "total_affected": result["valuation"]["total_affected"],
-            "total_cost": result["valuation"]["total_estimated_cost"],
-            "overall_risk": result["valuation"]["overall_risk"],
-            "auto_patched": result["patch"]["total_auto_patched"],
-            "needs_review": result["patch"]["total_needs_review"],
-        },
-        "incident_report": result["patch"]["incident_report"],
-    })
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    new_field = body.get("new_field",
