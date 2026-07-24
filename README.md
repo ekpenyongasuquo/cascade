@@ -30,3 +30,98 @@ curl -X POST https://cascade-ca0h.onrender.com/trigger \
 **API Docs:** https://cascade-ca0h.onrender.com/docs
 
 ## 🏗️ Architecture
+
+[GitHub PR Webhook]
+│
+▼
+[FastAPI Webhook Receiver]
+│
+▼
+[SCOUT Agent]
+Traverses DataHub downstream lineage graph
+Identifies all affected datasets, ML models, dashboards
+│
+▼
+[VALUATION Agent — Groq LLM]
+Reads tags: revenue_critical, regulatory, PII
+Assigns financial cost to each broken asset
+Generates executive summary
+│
+▼
+[PATCH Agent — Groq LLM]
+Auto-patches safe assets with corrected SQL
+Flags regulatory assets for human review
+Writes incident report back to DataHub
+│
+▼
+[GitHub PR Comment + DataHub Tagged Assets]
+
+
+## 🤖 Three Agents
+
+| Agent | Role | DataHub Integration |
+|-------|------|-------------------|
+| SCOUT | Lineage traversal | `get_lineage()` — downstream, 3 hops |
+| VALUATION | Financial quantification | `get_entities()` — tags, ownership, domain |
+| PATCH | Auto-remediation + write-back | `save_document()`, `add_tags()` |
+
+## 📊 Sample Output
+
+BLAST RADIUS REPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Assets affected: 4
+Auto-patched: 3 ✅
+Requires human review: 1 ⚠️
+Overall risk: CRITICAL 🚨
+Estimated cost: $80,000
+
+🚨 BLOCKER: q2_compliance_report [regulatory] — legal sign-off required
+
+
+## 🛠️ Tech Stack
+
+- **Agents:** Python + Groq (llama-3.3-70b-versatile)
+- **API:** FastAPI + Uvicorn
+- **DataHub:** MCP Server, Agent Context Kit, DataHub lineage tools
+- **Deployment:** Render
+
+## 🚀 Run Locally
+
+```bash
+git clone https://github.com/ekpenyongasuquo/cascade.git
+cd cascade
+pip install -r requirements.txt
+cp .env.example .env  # Add your GROQ_API_KEY
+python webhook/receiver.py
+```
+
+## 📁 Project Structure
+
+cascade/
+├── agents/
+│ ├── scout.py # Lineage traversal agent
+│ ├── valuation.py # Financial quantification agent
+│ └── patch.py # Auto-remediation agent
+├── webhook/
+│ └── receiver.py # FastAPI webhook receiver
+├── main.py # Pipeline orchestrator
+└── requirements.txt
+
+
+## 🌐 API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Service info |
+| `/health` | GET | Health check |
+| `/trigger` | POST | Manual CASCADE trigger |
+| `/webhook/github` | POST | GitHub PR webhook receiver |
+| `/docs` | GET | Swagger UI |
+
+## 🏆 Hackathon
+
+- **Event:** Build with DataHub: The Agent Hackathon
+- **Category:** Agents That Do Real Work + Production ML Agents
+- **Deadline:** August 10, 2026
+- **Author:** Ekpenyong Asuquo Mfon
+- **GitHub:** ekpenyongasuquo
