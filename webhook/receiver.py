@@ -178,4 +178,35 @@ async def manual_trigger(request: Request):
         "urn:li:dataset:(urn:li:dataPlatform:postgres,ecommerce.orders,PROD)"
     )
     changed_field = body.get("changed_field", "order_date")
-    new_field = body.get("new_field",
+    new_field = body.get("new_field", "created_at")
+
+    print(f"\n[CASCADE] Manual trigger — {changed_field} → {new_field}")
+
+    schema_change = {
+        "entity_urn": entity_urn,
+        "changed_field": changed_field,
+        "new_field": new_field,
+        "pr_number": "DEMO",
+        "pr_title": f"rename {changed_field} to {new_field}",
+        "repo": "demo/ecommerce",
+    }
+
+    result = run_cascade_pipeline(schema_change)
+
+    return JSONResponse({
+        "status": "cascade_complete",
+        "schema_change": schema_change,
+        "blast_radius": {
+            "total_affected": result["valuation"]["total_affected"],
+            "total_cost": result["valuation"]["total_estimated_cost"],
+            "overall_risk": result["valuation"]["overall_risk"],
+            "auto_patched": result["patch"]["total_auto_patched"],
+            "needs_review": result["patch"]["total_needs_review"],
+        },
+        "incident_report": result["patch"]["incident_report"],
+    })
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
